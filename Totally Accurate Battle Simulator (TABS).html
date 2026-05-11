@@ -1,1 +1,451 @@
+<!DOCTYPE html>
 
+<html lang="en-us">
+  <head>
+    <base href="https://cdn.jsdelivr.net/gh/web-ports/tabs@main/">
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Unity WebGL Player | TABS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+```
+  :root {
+    --navy:    #020b18;
+    --deep:    #041225;
+    --mid:     #062040;
+    --accent:  #0d6efd;
+    --glow:    #1a8cff;
+    --bright:  #4db8ff;
+    --dim:     #0a3560;
+    --error:   #ff3b5c;
+    --success: #00e5ff;
+  }
+
+  body {
+    background-color: black;
+    margin: 0; padding: 0;
+    overflow: hidden;
+    font-family: 'Rajdhani', sans-serif;
+  }
+
+  /* ── GAME CONTAINER (hidden until unlocked) ── */
+  #gameContainer {
+    width: 100vw !important;
+    height: 100vh !important;
+    display: none;
+  }
+  canvas { width: 100% !important; height: 100% !important; }
+
+  #loading-text {
+    font-weight: bold;
+    background: linear-gradient(270deg,#ff0000,#ff7f00,#ffff00,#00ff00,#0000ff,#4b0082,#8f00ff);
+    background-size: 400% 400%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: rainbow 3s ease infinite;
+  }
+  @keyframes rainbow {
+    0%   { background-position: 0%   50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0%   50%; }
+  }
+
+  /* ── PASSWORD OVERLAY ── */
+  #pw-overlay {
+    position: fixed; inset: 0;
+    background: var(--navy);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999;
+    overflow: hidden;
+  }
+
+  /* animated grid background */
+  #pw-overlay::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(13,110,253,.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(13,110,253,.08) 1px, transparent 1px);
+    background-size: 48px 48px;
+    animation: gridDrift 20s linear infinite;
+  }
+  @keyframes gridDrift {
+    from { background-position: 0 0; }
+    to   { background-position: 48px 48px; }
+  }
+
+  /* radial glow */
+  #pw-overlay::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 60% 50% at 50% 50%,
+      rgba(13,110,253,.18) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* floating particles */
+  .particle {
+    position: absolute;
+    width: 2px; height: 2px;
+    background: var(--glow);
+    border-radius: 50%;
+    opacity: 0;
+    animation: floatUp var(--dur) linear var(--delay) infinite;
+  }
+  @keyframes floatUp {
+    0%   { transform: translateY(100vh) translateX(0); opacity: 0; }
+    10%  { opacity: .6; }
+    90%  { opacity: .3; }
+    100% { transform: translateY(-10vh) translateX(var(--drift)); opacity: 0; }
+  }
+
+  /* ── CARD ── */
+  .pw-card {
+    position: relative; z-index: 1;
+    background: linear-gradient(160deg, rgba(4,18,37,.95) 0%, rgba(2,11,24,.98) 100%);
+    border: 1px solid rgba(13,110,253,.35);
+    border-radius: 4px;
+    padding: 52px 48px 44px;
+    width: 420px;
+    box-shadow:
+      0 0 0 1px rgba(13,110,253,.08),
+      0 0 40px rgba(13,110,253,.18),
+      0 0 80px rgba(13,110,253,.08),
+      inset 0 1px 0 rgba(77,184,255,.12);
+    text-align: center;
+    animation: cardReveal .8s cubic-bezier(.22,1,.36,1) both;
+  }
+  @keyframes cardReveal {
+    from { opacity: 0; transform: translateY(24px) scale(.97); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* corner accents */
+  .pw-card::before, .pw-card::after {
+    content: '';
+    position: absolute;
+    width: 18px; height: 18px;
+    border-color: var(--accent);
+    border-style: solid;
+  }
+  .pw-card::before {
+    top: -1px; left: -1px;
+    border-width: 2px 0 0 2px;
+  }
+  .pw-card::after {
+    bottom: -1px; right: -1px;
+    border-width: 0 2px 2px 0;
+  }
+
+  /* shield icon */
+  .shield-wrap {
+    margin: 0 auto 28px;
+    width: 72px; height: 72px;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .shield-wrap svg {
+    width: 52px; height: 52px;
+    fill: none;
+    stroke: var(--glow);
+    stroke-width: 1.5;
+    filter: drop-shadow(0 0 8px rgba(26,140,255,.6));
+    animation: shieldPulse 3s ease-in-out infinite;
+  }
+  @keyframes shieldPulse {
+    0%,100% { filter: drop-shadow(0 0 6px rgba(26,140,255,.5)); }
+    50%      { filter: drop-shadow(0 0 16px rgba(26,140,255,.9)); }
+  }
+  .shield-ring {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(13,110,253,.3);
+    animation: ringRotate 8s linear infinite;
+  }
+  @keyframes ringRotate { to { transform: rotate(360deg); } }
+
+  /* title */
+  .pw-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    color: #fff;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    text-shadow: 0 0 20px rgba(77,184,255,.4);
+  }
+  .pw-sub {
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: rgba(77,184,255,.55);
+    text-transform: uppercase;
+    margin-bottom: 36px;
+  }
+
+  /* label */
+  .pw-label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 2.5px;
+    color: rgba(77,184,255,.5);
+    text-transform: uppercase;
+    text-align: left;
+    margin-bottom: 10px;
+  }
+
+  /* input wrapper */
+  .input-wrap {
+    position: relative;
+    margin-bottom: 10px;
+  }
+  .input-wrap svg.lock-icon {
+    position: absolute;
+    left: 14px; top: 50%;
+    transform: translateY(-50%);
+    width: 16px; height: 16px;
+    stroke: rgba(77,184,255,.45);
+    fill: none;
+    stroke-width: 1.8;
+    pointer-events: none;
+  }
+
+  #pw-input {
+    width: 100%;
+    background: rgba(6,32,64,.6);
+    border: 1px solid rgba(13,110,253,.3);
+    border-radius: 3px;
+    padding: 14px 16px 14px 44px;
+    color: var(--bright);
+    font-family: 'Orbitron', monospace;
+    font-size: 18px;
+    letter-spacing: 6px;
+    text-align: center;
+    outline: none;
+    transition: border-color .25s, box-shadow .25s;
+    caret-color: var(--glow);
+  }
+  #pw-input::placeholder { color: rgba(77,184,255,.2); letter-spacing: 3px; font-size: 13px; }
+  #pw-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(13,110,253,.15), inset 0 0 12px rgba(13,110,253,.06);
+  }
+  #pw-input.shake {
+    animation: shake .4s cubic-bezier(.36,.07,.19,.97) both;
+    border-color: var(--error) !important;
+    box-shadow: 0 0 0 3px rgba(255,59,92,.12) !important;
+  }
+  @keyframes shake {
+    10%,90% { transform: translateX(-2px); }
+    20%,80% { transform: translateX(4px); }
+    30%,50%,70% { transform: translateX(-6px); }
+    40%,60% { transform: translateX(6px); }
+  }
+
+  /* error message */
+  #pw-error {
+    height: 18px;
+    margin-bottom: 20px;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--error);
+    text-transform: uppercase;
+    text-align: center;
+    opacity: 0;
+    transition: opacity .2s;
+    text-shadow: 0 0 8px rgba(255,59,92,.5);
+  }
+  #pw-error.visible { opacity: 1; }
+
+  /* button */
+  #pw-btn {
+    width: 100%;
+    padding: 15px;
+    background: linear-gradient(135deg, #0a4fa8 0%, #0d6efd 50%, #0a4fa8 100%);
+    background-size: 200% 100%;
+    border: 1px solid rgba(77,184,255,.3);
+    border-radius: 3px;
+    color: #fff;
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background-position .3s, box-shadow .3s, transform .15s;
+    box-shadow: 0 4px 20px rgba(13,110,253,.3);
+  }
+  #pw-btn:hover {
+    background-position: 100% 0;
+    box-shadow: 0 4px 28px rgba(13,110,253,.5);
+  }
+  #pw-btn:active { transform: scale(.98); }
+
+  /* success flash */
+  #pw-overlay.unlocking {
+    animation: flashUnlock .5s ease forwards;
+  }
+  @keyframes flashUnlock {
+    0%   { opacity: 1; }
+    50%  { opacity: 1; background: rgba(0,229,255,.08); }
+    100% { opacity: 0; }
+  }
+</style>
+```
+
+  </head>
+  <body>
+
+```
+<!-- PASSWORD OVERLAY -->
+<div id="pw-overlay">
+
+  <!-- particles (JS will position them) -->
+  <div id="particles"></div>
+
+  <div class="pw-card">
+    <div class="shield-wrap">
+      <div class="shield-ring"></div>
+      <svg viewBox="0 0 24 24">
+        <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"/>
+        <path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <div class="pw-title">TABS</div>
+    <div class="pw-sub">Access Restricted</div>
+
+    <label class="pw-label" for="pw-input">Enter Access Code</label>
+    <div class="input-wrap">
+      <svg class="lock-icon" viewBox="0 0 24 24">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+      <input id="pw-input" type="password" maxlength="8" placeholder="· · · ·" autocomplete="off" />
+    </div>
+
+    <div id="pw-error">⚠ Wrong Password</div>
+    <button id="pw-btn">Authenticate</button>
+  </div>
+</div>
+
+<!-- GAME -->
+<div id="loading-text"
+    style="display:none; color:white; font-size:48px; font-family:cursive; text-align:center; margin-top:20px;">
+  LOADING...
+</div>
+<div id="gameContainer"></div>
+<script src="Build/UnityLoader.js"></script>
+
+<script>
+  /* ── PARTICLES ── */
+  const pContainer = document.getElementById('particles');
+  for (let i = 0; i < 30; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.cssText = `
+      left: ${Math.random()*100}vw;
+      --dur: ${6 + Math.random()*10}s;
+      --delay: ${Math.random()*10}s;
+      --drift: ${(Math.random()-0.5)*80}px;
+    `;
+    pContainer.appendChild(p);
+  }
+
+  /* ── PASSWORD GATE ── */
+  const CORRECT = '1025';
+  const overlay  = document.getElementById('pw-overlay');
+  const input    = document.getElementById('pw-input');
+  const errorEl  = document.getElementById('pw-error');
+  const btn      = document.getElementById('pw-btn');
+  const loadText = document.getElementById('loading-text');
+  const gameDiv  = document.getElementById('gameContainer');
+
+  function tryUnlock() {
+    if (input.value === CORRECT) {
+      overlay.classList.add('unlocking');
+      setTimeout(() => {
+        overlay.style.display = 'none';
+        loadText.style.display = 'block';
+        gameDiv.style.display  = 'block';
+        startGame();
+      }, 500);
+    } else {
+      errorEl.classList.add('visible');
+      input.classList.remove('shake');
+      void input.offsetWidth; // reflow to restart animation
+      input.classList.add('shake');
+      input.value = '';
+      setTimeout(() => errorEl.classList.remove('visible'), 2500);
+    }
+  }
+
+  btn.addEventListener('click', tryUnlock);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); });
+  input.addEventListener('input',   ()  => errorEl.classList.remove('visible'));
+  input.focus();
+
+  /* ── GAME BOOTSTRAP (only runs after unlock) ── */
+  function startGame() {
+    var loadingText = document.querySelector("#loading-text");
+    let loadedBytes = 0;
+
+    async function fetchWithProgress(url) {
+      const response = await fetch(url);
+      const reader = response.body.getReader();
+      let chunks = [], received = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        received += value.length;
+        loadedBytes += value.length;
+        chunks.push(value);
+        let mbDone  = (loadedBytes / (1024 * 1024)).toFixed(2);
+        loadingText.textContent = `LOADING... ${mbDone} MB / 1746.00 MB`;
+      }
+      let fullBuffer = new Uint8Array(received), offset = 0;
+      for (let chunk of chunks) { fullBuffer.set(chunk, offset); offset += chunk.length; }
+      return fullBuffer.buffer;
+    }
+
+    async function mergeFiles(fileParts, cacheKey) {
+      const cache = await caches.open("tabs-cache");
+      const cachedResponse = await cache.match(cacheKey);
+      if (cachedResponse) {
+        const blob = await cachedResponse.blob();
+        return URL.createObjectURL(blob);
+      }
+      const buffers = await Promise.all(fileParts.map(part => fetchWithProgress(part)));
+      const mergedBlob = new Blob(buffers);
+      await cache.put(cacheKey, new Response(mergedBlob));
+      return URL.createObjectURL(mergedBlob);
+    }
+
+    function getParts(file, start, end) {
+      let parts = [];
+      for (let i = start; i <= end; i++) parts.push(file + ".part" + i);
+      return parts;
+    }
+
+    (async () => {
+      const [dataUrl, wasmUrl] = await Promise.all([
+        mergeFiles(getParts("Build/tabs.data.unityweb", 1, 86), "tabs.data.unityweb"),
+        mergeFiles(getParts("Build/tabs.wasm.code.unityweb", 1, 3), "tabs.wasm.code.unityweb"),
+      ]);
+      const originalOpen = XMLHttpRequest.prototype.open;
+      XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+        if (url.includes("tabs.data.unityweb"))      url = dataUrl;
+        else if (url.includes("tabs.wasm.code.unityweb")) url = wasmUrl;
+        return originalOpen.call(this, method, url, ...rest);
+      };
+      var unityInstance = UnityLoader.instantiate("gameContainer", "Build/tabs.json");
+      loadingText.remove();
+    })();
+  }
+</script>
+```
+
+  </body>
+</html>
